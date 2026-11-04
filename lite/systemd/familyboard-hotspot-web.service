@@ -1,0 +1,15 @@
+[Unit]
+Description=FamilyBoard hotspot — web config UI (Flask på 192.168.4.1:80)
+After=familyboard-hotspot.service
+BindsTo=familyboard-hotspot.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/familyboard-hotspot-config-server.py
+Restart=on-failure
+RestartSec=3
+# Trenger root for port 80
+User=root
+
+[Install]
+# Startes/stoppes av familyboard-hotspot.service

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<title>FamilyBoard – Recovery</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #0d1421 0%, #1a2533 100%);
+  color: #f0f0f0;
+  font-family: -apple-system, system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.card {
+  background: rgba(255,255,255,0.04);
+  border-radius: 24px;
+  padding: 50px 60px;
+  max-width: 720px;
+  width: 100%;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+h1 { font-size: 56px; margin: 0 0 12px 0; font-weight: 600; }
+.sub { color: #8da; margin-bottom: 40px; font-size: 22px; }
+.info { font-size: 24px; line-height: 1.8; margin: 30px 0; }
+.info .lbl { color: #888; }
+.info .val { color: #4af; font-weight: 600; }
+.help {
+  margin-top: 40px;
+  padding: 28px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 16px;
+  font-size: 20px;
+  line-height: 1.7;
+  text-align: left;
+  border-left: 4px solid #4af;
+}
+.help ol { padding-left: 28px; margin: 0; }
+.help b { color: #4af; }
+.spin {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #4af;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.footer { margin-top: 30px; color: #555; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📺 FamilyBoard Recovery</h1>
+  <p class="sub">Kunne ikke nå <span id="cloud-host">FamilyBoard</span></p>
+
+  <div class="info">
+    <div><span class="lbl">IP-adresse:</span> <span class="val" id="ip"><span class="spin"></span>henter…</span></div>
+    <div><span class="lbl">WiFi-nett:</span> <span class="val" id="ssid"><span class="spin"></span>henter…</span></div>
+    <div><span class="lbl">Hostname:</span> <span class="val" id="host"><span class="spin"></span>henter…</span></div>
+  </div>
+
+  <div class="help">
+    <b>Slik kobler du Pi-en til nytt WiFi:</b>
+    <ol>
+      <li>Ta telefonen, koble til WiFi-nettverk <b id="hotspot">FamilyBoard-Setup-XXXX</b>
+          (passord <b>familyboard</b>)<span id="hotspot-state"></span></li>
+      <li>Åpne <b>http://192.168.4.1</b> i telefonens nettleser</li>
+      <li>Velg ditt vanlige WiFi-nettverk og skriv passord</li>
+      <li>Vent ca. 1 minutt — Pi-en kobler seg til og åpner FamilyBoard</li>
+    </ol>
+    <p style="margin-top:20px; color:#888; font-size:16px;">
+    Eller: skriv <code>SSID=NyttNett</code> og <code>PSK=NyttPassord</code> i en
+    fil kalt <code>familyboard-wifi.conf</code> på en USB-stick og sett den i Pi-en.
+    </p>
+  </div>
+
+  <div class="footer">FamilyBoard Edge Lite • <span id="time"></span></div>
+</div>
+
+<script>
+async function load() {
+  try {
+    const r = await fetch('/recovery-info', { cache: 'no-store' });
+    const d = await r.json();
+    document.getElementById('ip').textContent   = d.ip   || 'ingen';
+    document.getElementById('ssid').textContent = d.ssid || 'ingen';
+    document.getElementById('host').textContent = d.host || '?';
+    if (d.hotspot_ssid) document.getElementById('hotspot').textContent = d.hotspot_ssid;
+    document.getElementById('hotspot-state').textContent =
+      d.hotspot_active ? ' — hotspot er PÅ' : ' — hotspot starter ca. 1 min etter oppstart uten nett';
+  } catch (e) {
+    document.getElementById('ip').textContent = 'kan ikke hente';
+  }
+}
+function tick() {
+  document.getElementById('time').textContent = new Date().toLocaleTimeString('nb-NO');
+}
+load();
+tick();
+setInterval(load, 5000);   // oppdater diagnose hvert 5s
+setInterval(tick, 1000);
+
+// Forsøk å nå Cloud hvert 30s — hvis OK, last på nytt
+// KIOSK_URL injiseres av installeren (erstatter __KIOSK_URL__).
+// Faller tilbake til recovery-server-verdi hvis ikke erstattet.
+const CLOUD_URL = '__KIOSK_URL__'.startsWith('http')
+  ? '__KIOSK_URL__'
+  : 'https://familyboard.cloud';
+try {
+  document.getElementById('cloud-host').textContent = new URL(CLOUD_URL).host;
+} catch (e) {}
+
+async function probeCloud() {
+  try {
+    await fetch(CLOUD_URL + '/healthz', { mode: 'no-cors', cache: 'no-store' });
+    // no-cors gir alltid status 0; men hvis fetch ikke kaster, har vi tilkobling
+    if (navigator.onLine) {
+      location.href = CLOUD_URL;
+    }
+  } catch (e) {}
+}
+setInterval(probeCloud, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[Unit]
+Description=FamilyBoard recovery-server (lokal HTML når Cloud er nede)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/familyboard-recovery-server.py
+Restart=always
+RestartSec=5
+User=root
+# Lytter kun på 127.0.0.1 → ingen ekstern eksponering
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+# FamilyBoard Edge Lite — hotspot for WiFi-oppsett
+#
+# Startes av wifi-recovery.service når Pi-en ikke har nett 60 s etter boot,
+# eller manuelt: sudo systemctl start familyboard-hotspot.service
+#
+# Merk:
+# - Ingen ConditionPathExists på hostapd-configen: den skrives av ExecStartPre,
+#   og Condition sjekkes FØR ExecStartPre (ga stille hopp over tjenesten).
+# - dnsmasq + web dras inn med Wants= (de har After=/BindsTo= denne). Å starte
+#   dem med "systemctl start" fra ExecStartPost gir vranglås fordi de venter på
+#   at denne skal bli ferdig med å starte.
+[Unit]
+Description=FamilyBoard hotspot for WiFi-konfigurasjon
+After=network.target NetworkManager.service
+Wants=familyboard-hotspot-dnsmasq.service familyboard-hotspot-web.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/bin/familyboard-hotspot-start.sh
+ExecStart=/usr/sbin/hostapd /etc/hostapd/familyboard.conf
+ExecStopPost=-/sbin/ip addr flush dev wlan0
+ExecStopPost=-/usr/bin/nmcli device set wlan0 managed yes
+Restart=no
+
+[Install]
+# Ikke enabled — startes kun ved behov.

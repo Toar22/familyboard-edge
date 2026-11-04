@@ -1,0 +1,15 @@
+[Unit]
+Description=FamilyBoard WiFi recovery (USB-config + hotspot fallback)
+After=multi-user.target wpa_supplicant.service NetworkManager.service
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/familyboard-wifi-recovery.sh
+TimeoutStartSec=90
+RemainAfterExit=no
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

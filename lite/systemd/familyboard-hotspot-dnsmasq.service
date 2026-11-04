@@ -1,0 +1,13 @@
+[Unit]
+Description=FamilyBoard hotspot — dnsmasq DHCP/DNS
+After=familyboard-hotspot.service
+BindsTo=familyboard-hotspot.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/dnsmasq -k -C /etc/dnsmasq.d/familyboard.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+# Startes/stoppes av familyboard-hotspot.service
