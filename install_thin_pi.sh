@@ -136,25 +136,76 @@ if [[ -f "${PI_HOME}/.config/familyboard/kiosk.env" ]]; then
   EXISTING_URL="$(grep -E '^KIOSK_URL=' "${PI_HOME}/.config/familyboard/kiosk.env" 2>/dev/null | head -1 | cut -d= -f2- || true)"
 fi
 
+# Terminal for spørsmål: fungerer også med «curl … | sudo bash» (stdin er da skriptet)
+TTY_IN=""
+if [[ -t 0 ]]; then TTY_IN="/dev/stdin"; elif [[ -r /dev/tty ]] && { : < /dev/tty; } 2>/dev/null; then TTY_IN="/dev/tty"; fi
+[[ -n "$TTY_IN" ]] && exec 3<"$TTY_IN"   # åpnes én gang, så svarene leses i rekkefølge
+ask() {  # ask "Spørsmål" → svar i $REPLY ("" hvis ikke interaktiv)
+  REPLY=""
+  [[ -n "$TTY_IN" ]] || return 0
+  printf '%s' "$1" >&2
+  read -r REPLY <&3 || REPLY=""
+}
+
+# Godta hel lenke, lenke uten https://, eller bare koden fra «Min konto → URLer»
+normalize_kiosk_url() {
+  local v="${1//[[:space:]]/}"
+  v="${v%/}"
+  if [[ "$v" =~ ^https?:// ]]; then echo "$v"; return; fi
+  if [[ "$v" == */d/* || "$v" == *.* ]]; then echo "https://${v}"; return; fi
+  if [[ -n "$v" ]]; then echo "${KIOSK_URL_DEFAULT}/d/${v}"; fi
+  return 0
+}
+
+# 0 = gyldig visnings-URL, 1 = ugyldig (404), 2 = kunne ikke sjekke (nett nede o.l.)
+check_kiosk_url() {
+  command -v curl >/dev/null 2>&1 || return 2
+  local code loc
+  read -r code loc < <(curl -s -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "$1" 2>/dev/null || echo "000 -")
+  case "$code" in
+    200|301|302|303|307|308) return 0 ;;   # /d/<kode> sender videre til /dashboard
+    404|410) return 1 ;;                    # «Ugyldig lenke»
+    *) return 2 ;;
+  esac
+}
+
 if [[ -n "${KIOSK_URL:-}" ]]; then
+  KIOSK_URL="$(normalize_kiosk_url "$KIOSK_URL")"
   say "Kiosk-URL fra miljøvariabel: ${KIOSK_URL}"
 elif [[ -n "$EXISTING_URL" ]]; then
   KIOSK_URL="$EXISTING_URL"
-  say "Gjenbruker eksisterende kiosk-URL: ${KIOSK_URL}"
-  say "(Sett KIOSK_URL=... foran kommandoen for å overstyre)"
-elif [[ -t 0 ]]; then
+  ask "Bruke samme skjerm-lenke som før (${EXISTING_URL})? [J/n] "
+  if [[ "${REPLY,,}" == n* ]]; then KIOSK_URL=""; fi
+  [[ -n "$KIOSK_URL" ]] && say "Gjenbruker kiosk-URL: ${KIOSK_URL}"
+fi
+
+if [[ -z "${KIOSK_URL:-}" ]]; then
+  if [[ -z "$TTY_IN" ]]; then
+    err "Ingen skjerm-lenke. Kjør på nytt med: sudo KIOSK_URL=\"https://familyboard.cloud/d/DIN-KODE\" bash install_thin_pi.sh"
+    exit 1
+  fi
   echo
-  echo "📺 Hvilken FamilyBoard-URL skal Pi-en åpne?"
-  echo "   - Lim inn full URL inkl. /d/<token>"
-  echo "   - Eller scan QR-kode generert i Cloud → 'Min Pi'-knappen"
-  echo "   - Trykk Enter for default (${KIOSK_URL_DEFAULT})"
+  echo "📺 Hvilken FamilyBoard-skjerm skal denne Pi-en vise?"
+  echo "   Finn lenken på familyboard.cloud → «👤 Min konto» → URLer"
+  echo "   (lag en med «Opprett» hvis du ikke har noen)."
+  echo "   Lim inn hele lenken, f.eks. https://familyboard.cloud/d/abc123 – eller bare koden."
   echo
-  read -rp "Kiosk-URL: " KIOSK_URL
-  KIOSK_URL="${KIOSK_URL:-$KIOSK_URL_DEFAULT}"
-else
-  # Ikke-interaktiv uten URL → bruk default
-  KIOSK_URL="$KIOSK_URL_DEFAULT"
-  say "Ikke-interaktiv og ingen URL angitt — bruker default: ${KIOSK_URL}"
+  for attempt in 1 2 3 4 5; do
+    ask "Skjerm-lenke: "
+    KIOSK_URL="$(normalize_kiosk_url "$REPLY")"
+    if [[ -z "$KIOSK_URL" ]]; then warn "Tomt svar – prøv igjen."; continue; fi
+    rc=0; check_kiosk_url "$KIOSK_URL" || rc=$?
+    if [[ $rc -eq 0 ]]; then say "✔ Lenken virker: $KIOSK_URL"; break; fi
+    if [[ $rc -eq 1 ]]; then
+      warn "Fant ingen skjerm med den lenken (ugyldig eller slettet). Sjekk under «Min konto» → URLer."
+      KIOSK_URL=""; continue
+    fi
+    warn "Fikk ikke sjekket lenken nå (ingen nettforbindelse?)."
+    ask "Bruke den likevel? [j/N] "
+    if [[ "${REPLY,,}" == j* ]]; then break; fi
+    KIOSK_URL=""
+  done
+  if [[ -z "${KIOSK_URL:-}" ]]; then err "Ingen gyldig skjerm-lenke – avbryter uten endringer."; exit 1; fi
 fi
 
 if [[ ! "$KIOSK_URL" =~ ^https?:// ]]; then
@@ -924,3 +975,11 @@ echo "   tail -f /tmp/familyboard-kiosk.log"
 echo
 warn "IKKE kjør 'sudo apt autoremove' på denne Pi-en — popup-purgen fjernet"
 warn "ubuntu-desktop-metapakken, og autoremove ville da fjerne skrivebordet."
+
+REPLY="n"
+[[ -z "${FB_NO_REBOOT_PROMPT:-}" ]] && ask "Start på nytt nå så skjermen tar i bruk FamilyBoard? [J/n] "
+if [[ -n "$TTY_IN" && -z "${FB_NO_REBOOT_PROMPT:-}" && "${REPLY,,}" != n* ]]; then
+  say "Starter på nytt om 5 sekunder…"
+  sleep 5
+  reboot
+fi

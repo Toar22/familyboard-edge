@@ -20,14 +20,21 @@ Ingen GitHub-konto trengs.
 Logg inn på Pi-en (med tastatur eller `ssh bruker@pi-navn`) og kjør:
 
 ```bash
-sudo apt-get install -y git
-git clone https://github.com/Toar22/familyboard-edge.git ~/familyboard-edge
-cd ~/familyboard-edge
-sudo KIOSK_URL="https://familyboard.cloud/d/DIN-KODE" bash install_thin_pi.sh
-sudo reboot
+curl -fsSL https://raw.githubusercontent.com/Toar22/familyboard-edge/main/install.sh | sudo bash
 ```
 
+Installeren spør etter visnings-URL-en din (lim inn hele lenken, eller bare koden
+etter `/d/`), sjekker at den virker, og spør til slutt om Pi-en skal starte på nytt.
 Etter omstart viser skjermen dashboardet i fullskjerm.
+
+<details><summary>Uten spørsmål (f.eks. for flere Pi-er)</summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Toar22/familyboard-edge/main/install.sh \
+  | sudo KIOSK_URL="https://familyboard.cloud/d/DIN-KODE" bash
+sudo reboot
+```
+</details>
 
 > Har skjermen en **eldre FamilyBoard Edge** fra før? Ta en sikkerhetskopi først,
 > se [Bytte fra eldre Edge](#bytte-fra-eldre-edge).
@@ -41,9 +48,10 @@ bash ~/familyboard-edge/update_thin_pi.sh
 ## Bytte hvilken skjerm/visnings-URL Pi-en viser
 
 ```bash
-cd ~/familyboard-edge
-sudo KIOSK_URL="https://familyboard.cloud/d/NY-KODE" bash install_thin_pi.sh
+sudo bash ~/familyboard-edge/install_thin_pi.sh
 ```
+
+Svar **n** på «Bruke samme skjerm-lenke som før?» og lim inn den nye lenken.
 
 Endringer i layout, design, kalender og bilder gjøres på familyboard.cloud og vises
 på skjermen innen ca. 5 minutter – du trenger ikke røre Pi-en.
@@ -83,8 +91,7 @@ først, så du kan gå tilbake:
 git clone https://github.com/Toar22/familyboard-edge.git ~/familyboard-edge
 cd ~/familyboard-edge
 sudo bash migrering/backup_gammel_edge.sh        # lager /root/fb-edge-backup-…
-sudo KIOSK_URL="https://familyboard.cloud/d/DIN-KODE" bash install_thin_pi.sh
-sudo reboot
+sudo bash install_thin_pi.sh                      # spør etter visnings-URL og omstart
 ```
 
 Tilbake til eldre Edge:
