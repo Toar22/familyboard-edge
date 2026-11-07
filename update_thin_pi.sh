@@ -26,7 +26,7 @@ else
 fi
 
 echo "▶ Kjører installeren på nytt (beholder skjerm-URL)…"
-sudo FB_NO_REBOOT_PROMPT=1 bash "${REPO_DIR}/install_thin_pi.sh" < /dev/null
+sudo FB_NONINTERACTIVE=1 FB_NO_REBOOT_PROMPT=1 bash "${REPO_DIR}/install_thin_pi.sh" < /dev/null
 
 echo "▶ Starter kiosken på nytt…"
 systemctl --user restart chromium-kiosk.service 2>/dev/null || true

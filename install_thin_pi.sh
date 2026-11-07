@@ -138,7 +138,7 @@ fi
 
 # Terminal for spørsmål: fungerer også med «curl … | sudo bash» (stdin er da skriptet)
 TTY_IN=""
-if [[ -t 0 ]]; then TTY_IN="/dev/stdin"; elif [[ -r /dev/tty ]] && { : < /dev/tty; } 2>/dev/null; then TTY_IN="/dev/tty"; fi
+if [[ -n "${FB_NONINTERACTIVE:-}" ]]; then :; elif [[ -t 0 ]]; then TTY_IN="/dev/stdin"; elif [[ -r /dev/tty ]] && { : < /dev/tty; } 2>/dev/null; then TTY_IN="/dev/tty"; fi
 [[ -n "$TTY_IN" ]] && exec 3<"$TTY_IN"   # åpnes én gang, så svarene leses i rekkefølge
 ask() {  # ask "Spørsmål" → svar i $REPLY ("" hvis ikke interaktiv)
   REPLY=""
