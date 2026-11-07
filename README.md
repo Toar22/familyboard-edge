@@ -69,8 +69,16 @@ DISPLAY=:0 chromium-browser --user-data-dir=$HOME/snap/chromium/common/familyboa
 systemctl --user start chromium-kiosk.service
 ```
 
-På Raspberry Pi OS (uten snap) er profilmappen `$HOME/.config/familyboard-kiosk-profile`,
-og nettleseren heter ofte `chromium`.
+På **Raspberry Pi OS** (Bookworm/Trixie, Wayland) bruker du i stedet:
+
+```bash
+systemctl --user stop chromium-kiosk.service
+XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0 chromium --ozone-platform=wayland \
+  --user-data-dir=$HOME/.config/familyboard-kiosk-profile \
+  --profile-directory=FamilyBoardKiosk https://accounts.google.com &
+# logg inn, lukk vinduet, og så:
+systemctl --user start chromium-kiosk.service
+```
 
 ## Flytte skjermen / nytt WiFi
 
