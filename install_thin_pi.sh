@@ -294,6 +294,7 @@ fi
 # System-verktøy (alle Pi-OS-installer trenger disse)
 apt-get install -y -q \
   curl ca-certificates jq unclutter xdotool wmctrl \
+  x11-xserver-utils xauth \
   iw wireless-tools wpasupplicant \
   hostapd dnsmasq \
   python3-flask python3-requests \
@@ -779,6 +780,10 @@ cat > "${OPENBOX_AUTOSTART}" <<'EOF'
 xset s off
 xset s noblank
 xset -dpms
+# Gi kiosk-tjenesten (samme bruker) tilgang til skjermen uten X-cookie –
+# en gammel ~/.Xauthority ga ellers «Invalid MIT-MAGIC-COOKIE-1 key».
+xhost +SI:localuser:"$(id -un)" >/dev/null 2>&1
+systemctl --user import-environment DISPLAY XAUTHORITY 2>/dev/null
 EOF
 chown -R "${PI_USER}:${PI_USER}" "$(dirname "$OPENBOX_AUTOSTART")"
 say "openbox autostart ryddet (ingen konkurrerende kiosk)"
