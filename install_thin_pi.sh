@@ -674,7 +674,9 @@ while true; do
     --disable-infobars \
     --disable-extensions \
     --disable-plugins \
-    --disable-features=TranslateUI,VizDisplayCompositor \
+    --disable-features=Translate,TranslateUI,VizDisplayCompositor \
+    --lang=nb-NO \
+    --accept-lang=nb-NO,nb,no,en \
     --password-store=basic \
     --user-data-dir="${KIOSK_PROFILE_DIR}" \
     --profile-directory="FamilyBoardKiosk" \
