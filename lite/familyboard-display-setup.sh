@@ -17,10 +17,16 @@
 set -u
 
 # Finn faktisk X-display dynamisk (GDM kan gi :1, ikke alltid :0).
+# Wayland-økt (labwc/wayfire på Raspberry Pi OS): xrandr gjelder ikke – hopp over
+if pgrep -u "$(id -u)" -x 'labwc|wayfire|sway|cage|weston' >/dev/null 2>&1; then
+  echo "[display-setup] Wayland-økt – hopper over X-skjermoppsett"
+  exit 0
+fi
+
 # Ta DISPLAY/XAUTHORITY fra den kjørende skrivebordsøkta – den har alltid riktig
 # X-cookie. (En gammel ~/.Xauthority ga «Invalid MIT-MAGIC-COOKIE-1 key».)
 for _p in $(pgrep -u "$(id -u)" -x 'openbox|lxsession|lxsession-xdg-autostart|xfce4-session|gnome-shell|Xsession|x-session-manager' 2>/dev/null); do
-  _env="$(tr '\0' '\n' < "/proc/${_p}/environ" 2>/dev/null)" || continue
+  _env="$(tr '\0' '\n' 2>/dev/null < "/proc/${_p}/environ")" || continue
   _d="$(sed -n 's/^DISPLAY=//p' <<<"$_env" | head -1)"
   [[ -n "$_d" ]] || continue
   export DISPLAY="$_d"

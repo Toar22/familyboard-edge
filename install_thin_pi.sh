@@ -472,11 +472,32 @@ KIOSK_URL="${KIOSK_URL:-https://familyboard.cloud}"
 RECOVERY_URL="http://127.0.0.1:5001"
 RELAUNCH_DELAY="${RELAUNCH_DELAY:-10}"
 
+# --- Wayland-økt? (Raspberry Pi OS Bookworm/Trixie kjører labwc/wayfire) ---
+# Da er :0 ofte innloggingsskjermens Xwayland (eid av lightdm) – Chromium blir
+# avvist der («Invalid MIT-MAGIC-COOKIE-1 key»). Bruk Wayland-socketen i stedet.
+SESSION_KIND="x11"
+_wp="$(pgrep -u "$(id -u)" -x 'labwc|wayfire|sway|cage|weston' 2>/dev/null | head -1)"
+if [[ -n "$_wp" ]]; then
+  _wenv="$(tr '\0' '\n' 2>/dev/null < "/proc/${_wp}/environ" || true)"
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  _wd="$(sed -n 's/^WAYLAND_DISPLAY=//p' <<<"$_wenv" | head -1)"
+  if [[ -z "$_wd" ]]; then
+    for _ws in "${XDG_RUNTIME_DIR}"/wayland-[0-9]; do [[ -S "$_ws" ]] && _wd="${_ws##*/}" && break; done
+  fi
+  if [[ -n "$_wd" && -S "${XDG_RUNTIME_DIR}/${_wd}" ]]; then
+    SESSION_KIND="wayland"
+    export WAYLAND_DISPLAY="$_wd"
+    unset DISPLAY XAUTHORITY
+    log "Wayland-økt: $(cat /proc/${_wp}/comm 2>/dev/null) WAYLAND_DISPLAY=${WAYLAND_DISPLAY}"
+  fi
+fi
+
 # --- X-miljø (for xrandr + chromium) ---
+if [[ "$SESSION_KIND" == "x11" ]]; then
 # Ta DISPLAY/XAUTHORITY fra den kjørende skrivebordsøkta – den har alltid riktig
 # X-cookie. (En gammel ~/.Xauthority ga «Invalid MIT-MAGIC-COOKIE-1 key».)
 for _p in $(pgrep -u "$(id -u)" -x 'openbox|lxsession|lxsession-xdg-autostart|xfce4-session|gnome-shell|Xsession|x-session-manager' 2>/dev/null); do
-  _env="$(tr '\0' '\n' < "/proc/${_p}/environ" 2>/dev/null)" || continue
+  _env="$(tr '\0' '\n' 2>/dev/null < "/proc/${_p}/environ")" || continue
   _d="$(sed -n 's/^DISPLAY=//p' <<<"$_env" | head -1)"
   [[ -n "$_d" ]] || continue
   export DISPLAY="$_d"
@@ -495,11 +516,12 @@ fi
 export DISPLAY="${DISPLAY:-:0}"
 if [[ -z "${XAUTHORITY:-}" ]]; then
   for _xa in "${HOME}/.Xauthority" "/run/user/$(id -u)/gdm/Xauthority" \
-             "/var/run/lightdm/${USER}/xauthority" "/run/lightdm/${USER}/xauthority"; do
+             "/var/run/lightdm/${USER:-$(id -un)}/xauthority" "/run/lightdm/${USER:-$(id -un)}/xauthority"; do
     [[ -f "$_xa" ]] && export XAUTHORITY="$_xa" && break
   done
 fi
 log "X: DISPLAY=${DISPLAY} XAUTHORITY=${XAUTHORITY:-unset}"
+fi
 
 # --- Finn Chromium-binær ---
 CHROMIUM_BIN="$(command -v chromium-browser || command -v chromium || echo /usr/bin/chromium)"
@@ -570,7 +592,7 @@ pick_target() {
      || curl -fsS --max-time 5 -o /dev/null "${KIOSK_URL}" 2>/dev/null; then
     echo "${KIOSK_URL}"
   else
-    log "Cloud ikke nåbar — fallback til recovery (${RECOVERY_URL})"
+    log "Cloud ikke nåbar — fallback til recovery (${RECOVERY_URL})" >&2
     echo "${RECOVERY_URL}"
   fi
 }
@@ -582,7 +604,7 @@ while true; do
   # Skjerm settes FØR HVER chromium-start. Kritisk ved treg kald-boot: hvis X
   # ikke var klar ved første forsøk, får neste runde speilingen på plass — ellers
   # kunne dual-HDMI halv-skjerm-bugen (framebuffer extended) blitt permanent.
-  setup_display_x11
+  [[ "$SESSION_KIND" == "x11" ]] && setup_display_x11
 
   # Rens lock-filer + drep ev. rester før ny start
   rm -f "${KIOSK_PROFILE_DIR}/SingletonLock" \
@@ -597,7 +619,7 @@ while true; do
   # Fallback: hvis window-manageren dekorerer/halv-størrelser --kiosk-vinduet
   # (f.eks. GNOME/mutter), tving fullskjerm via EWMH når vinduet dukker opp.
   # Ufarlig under openbox (der --kiosk allerede er fullskjerm).
-  if command -v wmctrl >/dev/null 2>&1; then
+  if [[ "$SESSION_KIND" == "x11" ]] && command -v wmctrl >/dev/null 2>&1; then
     (
       for _w in $(seq 1 30); do
         ids="$(wmctrl -l 2>/dev/null | grep -iE 'dashboard|familyboard|chromium' | awk '{print $1}')"
@@ -618,7 +640,13 @@ while true; do
   # MERK: IKKE bruk --window-size/--window-position sammen med --kiosk —
   # de tvinger Chromium til vindusmodus (viser verktøylinje). Med korrekt
   # framebuffer (display-setup) + openbox-sesjon dekker --kiosk hele skjermen.
+  if [[ "$SESSION_KIND" == "wayland" ]]; then
+    PLATFORM_ARGS=(--ozone-platform=wayland --enable-features=UseOzonePlatform,SharedArrayBuffer)
+  else
+    PLATFORM_ARGS=(--ozone-platform=x11 --enable-features=SharedArrayBuffer)
+  fi
   "${CHROMIUM_BIN}" \
+    "${PLATFORM_ARGS[@]}" \
     --kiosk \
     --start-fullscreen \
     --no-first-run \
@@ -640,7 +668,6 @@ while true; do
     --noerrdialogs \
     --disable-session-crashed-bubble \
     --disable-translate \
-    --enable-features=SharedArrayBuffer \
     "${TARGET_URL}"
 
   EC=$?
@@ -887,6 +914,11 @@ WantedBy=multi-user.target
 EOF
 systemctl enable wifi-no-powersave.service 2>/dev/null || true
 say "J5: WiFi power-save deaktivert"
+
+# --- J5b: Skjermblanking av på Raspberry Pi OS (gjelder også Wayland/labwc) ---
+if command -v raspi-config >/dev/null 2>&1; then
+  raspi-config nonint do_blanking 1 2>/dev/null && say "J5b: Skjermblanking slått av (raspi-config)" || true
+fi
 
 # --- J6: Kiosk Restart=always (allerede satt i Blokk C above) ---
 say "J6: chromium-kiosk.service har Restart=always (Blokk C)"
