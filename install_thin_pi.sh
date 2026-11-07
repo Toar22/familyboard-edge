@@ -491,6 +491,9 @@ fi
 KIOSK_URL="${KIOSK_URL:-https://familyboard.cloud}"
 RECOVERY_URL="http://127.0.0.1:5001"
 RELAUNCH_DELAY="${RELAUNCH_DELAY:-10}"
+# Ekstra Chromium-flagg for feilsøking, f.eks. i kiosk.env:
+#   CHROMIUM_EXTRA_FLAGS="--remote-debugging-port=9222 --disable-gpu"
+read -r -a EXTRA_ARGS <<<"${CHROMIUM_EXTRA_FLAGS:-}"
 
 # --- Wayland-økt? (Raspberry Pi OS Bookworm/Trixie kjører labwc/wayfire) ---
 # Da er :0 ofte innloggingsskjermens Xwayland (eid av lightdm) – Chromium blir
@@ -667,6 +670,7 @@ while true; do
   fi
   "${CHROMIUM_BIN}" \
     "${PLATFORM_ARGS[@]}" \
+    "${EXTRA_ARGS[@]}" \
     --kiosk \
     --start-fullscreen \
     --no-first-run \
@@ -944,6 +948,19 @@ fi
 
 # --- J6: Kiosk Restart=always (allerede satt i Blokk C above) ---
 say "J6: chromium-kiosk.service har Restart=always (Blokk C)"
+
+# --- J6b: Chromium-policy for kiosken ---
+# Google-kalenderen er en iframe (google.com inne i familyboard.cloud). Den ser
+# bare innloggingen hvis tredjeparts-cookies er tillatt – Chromium på Raspberry
+# Pi OS blokkerer dem, så private kalendere ble skjult («du har ikke tillatelse»).
+_FB_POLICY='{
+  "BlockThirdPartyCookies": false,
+  "TranslateEnabled": false
+}'
+for _pd in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
+  mkdir -p "$_pd" && printf '%s\n' "$_FB_POLICY" > "${_pd}/familyboard.json"
+done
+say "J6b: Chromium-policy satt (tredjeparts-cookies for kalender, ingen oversetting)"
 
 # --- J7: Recovery-server + HTML ---
 # NB: || warn på hvert steg — under set -e ville én manglende fil ellers
