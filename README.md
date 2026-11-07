@@ -59,7 +59,11 @@ på skjermen innen ca. 5 minutter – du trenger ikke røre Pi-en.
 ## Google-kalender (privat kalender)
 
 En privat Google-kalender vises bare når skjermens nettleser er logget inn på Google.
-Koble til tastatur og mus, og kjør i et terminalvindu på Pi-en:
+
+**Enklest:** koble mus og tastatur til Pi-en, åpne kalenderoverlayet på skjermen
+(«vis kalender») og logg inn på Google derfra. Innloggingen huskes etter omstart.
+
+Alternativt, fra et terminalvindu på Pi-en:
 
 ```bash
 systemctl --user stop chromium-kiosk.service
