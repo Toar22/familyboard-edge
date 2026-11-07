@@ -472,7 +472,18 @@ RECOVERY_URL="http://127.0.0.1:5001"
 RELAUNCH_DELAY="${RELAUNCH_DELAY:-10}"
 
 # --- X-miljø (for xrandr + chromium) ---
-# Finn faktisk X-display dynamisk (GDM kan gi :1, ikke alltid :0).
+# Ta DISPLAY/XAUTHORITY fra den kjørende skrivebordsøkta – den har alltid riktig
+# X-cookie. (En gammel ~/.Xauthority ga «Invalid MIT-MAGIC-COOKIE-1 key».)
+for _p in $(pgrep -u "$(id -u)" -x 'openbox|lxsession|lxsession-xdg-autostart|xfce4-session|gnome-shell|Xsession|x-session-manager' 2>/dev/null); do
+  _env="$(tr '\0' '\n' < "/proc/${_p}/environ" 2>/dev/null)" || continue
+  _d="$(sed -n 's/^DISPLAY=//p' <<<"$_env" | head -1)"
+  [[ -n "$_d" ]] || continue
+  export DISPLAY="$_d"
+  _x="$(sed -n 's/^XAUTHORITY=//p' <<<"$_env" | head -1)"
+  [[ -n "$_x" && -f "$_x" ]] && export XAUTHORITY="$_x"
+  break
+done
+# Ellers: finn faktisk X-display dynamisk (GDM kan gi :1, ikke alltid :0).
 if [[ -z "${DISPLAY:-}" ]]; then
   for _s in /tmp/.X11-unix/X*; do
     [[ -e "$_s" ]] || continue
@@ -481,10 +492,13 @@ if [[ -z "${DISPLAY:-}" ]]; then
   done
 fi
 export DISPLAY="${DISPLAY:-:0}"
-for _xa in "${HOME}/.Xauthority" "/run/user/$(id -u)/gdm/Xauthority" \
-           "/var/run/lightdm/${USER}/xauthority" "/run/lightdm/${USER}/xauthority"; do
-  [[ -f "$_xa" ]] && export XAUTHORITY="$_xa" && break
-done
+if [[ -z "${XAUTHORITY:-}" ]]; then
+  for _xa in "${HOME}/.Xauthority" "/run/user/$(id -u)/gdm/Xauthority" \
+             "/var/run/lightdm/${USER}/xauthority" "/run/lightdm/${USER}/xauthority"; do
+    [[ -f "$_xa" ]] && export XAUTHORITY="$_xa" && break
+  done
+fi
+log "X: DISPLAY=${DISPLAY} XAUTHORITY=${XAUTHORITY:-unset}"
 
 # --- Finn Chromium-binær ---
 CHROMIUM_BIN="$(command -v chromium-browser || command -v chromium || echo /usr/bin/chromium)"

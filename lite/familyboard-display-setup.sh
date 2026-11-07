@@ -17,6 +17,17 @@
 set -u
 
 # Finn faktisk X-display dynamisk (GDM kan gi :1, ikke alltid :0).
+# Ta DISPLAY/XAUTHORITY fra den kjørende skrivebordsøkta – den har alltid riktig
+# X-cookie. (En gammel ~/.Xauthority ga «Invalid MIT-MAGIC-COOKIE-1 key».)
+for _p in $(pgrep -u "$(id -u)" -x 'openbox|lxsession|lxsession-xdg-autostart|xfce4-session|gnome-shell|Xsession|x-session-manager' 2>/dev/null); do
+  _env="$(tr '\0' '\n' < "/proc/${_p}/environ" 2>/dev/null)" || continue
+  _d="$(sed -n 's/^DISPLAY=//p' <<<"$_env" | head -1)"
+  [[ -n "$_d" ]] || continue
+  export DISPLAY="$_d"
+  _x="$(sed -n 's/^XAUTHORITY=//p' <<<"$_env" | head -1)"
+  [[ -n "$_x" && -f "$_x" ]] && export XAUTHORITY="$_x"
+  break
+done
 if [[ -z "${DISPLAY:-}" ]]; then
   for _s in /tmp/.X11-unix/X*; do
     [[ -e "$_s" ]] || continue
@@ -27,12 +38,14 @@ fi
 export DISPLAY="${DISPLAY:-:0}"
 
 # Finn en gyldig X-authority (LightDM: ~/.Xauthority; andre varianter dekket)
-for xa in "${HOME}/.Xauthority" \
-          "/run/user/$(id -u)/gdm/Xauthority" \
-          "/var/run/lightdm/${USER}/xauthority" \
-          "/run/lightdm/${USER}/xauthority"; do
-  if [[ -f "$xa" ]]; then export XAUTHORITY="$xa"; break; fi
-done
+if [[ -z "${XAUTHORITY:-}" ]]; then
+  for xa in "${HOME}/.Xauthority" \
+            "/run/user/$(id -u)/gdm/Xauthority" \
+            "/var/run/lightdm/${USER}/xauthority" \
+            "/run/lightdm/${USER}/xauthority"; do
+    if [[ -f "$xa" ]]; then export XAUTHORITY="$xa"; break; fi
+  done
+fi
 
 log() { echo "[display-setup] $*"; }
 
