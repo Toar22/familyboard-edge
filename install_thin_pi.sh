@@ -333,33 +333,53 @@ say "Chromium: $CHROMIUM_BIN"
 # =============================================================================
 progress "BLOKK H — Slår av popups, varsler og keyring"
 
+# Fjern pakker BARE hvis det ikke drar med seg noe annet. På Raspberry Pi OS
+# trixie fjernet f.eks. purge av gnome-keyring også skrivebordsøkta (rpd-labwc),
+# så autologin feilet og skjermen ble stående svart. Simuler først; hopp over
+# hvis apt vil fjerne flere pakker enn de vi ba om.
+safe_purge() {
+  local want=() p extra
+  for p in "$@"; do
+    dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "install ok installed" && want+=("$p")
+  done
+  [[ ${#want[@]} -gt 0 ]] || return 0
+  extra="$(apt-get -s -y purge "${want[@]}" 2>/dev/null \
+    | awk '/^(Purg|Remv) /{print $2}' \
+    | grep -vxF -f <(printf '%s\n' "${want[@]}") || true)"
+  if [[ -n "$extra" ]]; then
+    warn "Fjerner ikke ${want[*]} – det ville også fjernet: $(echo $extra | tr '\n' ' ')"
+    return 0
+  fi
+  DEBIAN_FRONTEND=noninteractive apt-get -y -q purge "${want[@]}" >/dev/null 2>&1 || true
+}
+
 # Update-popups — kilde for "Updates available"-bannere.
 # VIKTIG: IKKE purge update-notifier — den er en avhengighet av
 # ubuntu-desktop-metapakken, og purge drar hele metapakken med seg (som
 # markerer skrivebordet som autoremovable). Vi deaktiverer autostart i
 # stedet (se autostart-loop under) og masker tjenestene.
 systemctl mask update-notifier-download.timer update-notifier-motd.timer 2>/dev/null || true
-apt-get -y purge unattended-upgrades 2>/dev/null || true
+safe_purge unattended-upgrades
 # software-properties-gtk alene er trygt å fjerne (ingen desktop-kaskade)
-apt-get -y purge software-properties-gtk 2>/dev/null || true
+safe_purge software-properties-gtk
 
 # Generelle systemvarsler
-apt-get -y purge notify-osd lxqt-notificationd 2>/dev/null || true
+safe_purge notify-osd lxqt-notificationd
 
 # Keyring/wallet (Chromium har --password-store=basic, men annet kan trigge popup)
-apt-get -y purge gnome-keyring gnome-keyring-pkcs11 2>/dev/null || true
-apt-get -y purge seahorse 2>/dev/null || true
-apt-get -y purge kwalletmanager kwallet-pam libpam-kwallet5 2>/dev/null || true
-apt-get -y purge libpam-gnome-keyring 2>/dev/null || true
+safe_purge gnome-keyring gnome-keyring-pkcs11
+safe_purge seahorse
+safe_purge kwalletmanager kwallet-pam libpam-kwallet5
+safe_purge libpam-gnome-keyring
 
 # Polkit-popups (sjelden, men kan komme hvis script-er bruker pkexec)
-apt-get -y purge policykit-1-gnome polkit-kde-agent-1 2>/dev/null || true
+safe_purge policykit-1-gnome polkit-kde-agent-1
 
 # Bluetooth-pairing-popups
-apt-get -y purge blueman 2>/dev/null || true
+safe_purge blueman
 
 # ssh-askpass-popup ved nettverk-ssh
-apt-get -y purge ssh-askpass ssh-askpass-gnome 2>/dev/null || true
+safe_purge ssh-askpass ssh-askpass-gnome
 
 # Maskér nm-applet (uten å fjerne pakken — den brukes av nettverks-stack)
 mkdir -p "${PI_HOME}/.config/autostart"
@@ -864,7 +884,7 @@ EOF
 udevadm control --reload-rules 2>/dev/null || true
 
 # Fjern gvfs-backends så ingen popups
-apt-get -y purge gvfs-backends 2>/dev/null || true
+safe_purge gvfs-backends
 say "J3: USB-automount slått av"
 
 # --- J4: Logg-størrelse cap ---
