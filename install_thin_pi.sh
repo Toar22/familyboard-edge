@@ -897,10 +897,14 @@ say "J3: USB-automount slått av"
 mkdir -p /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/familyboard.conf <<'EOF'
 [Journal]
+# Behold loggen over omstart, så nettfall o.l. kan feilsøkes etterpå
+Storage=persistent
 SystemMaxUse=200M
 SystemKeepFree=500M
 RuntimeMaxUse=50M
 EOF
+mkdir -p /var/log/journal
+systemctl restart systemd-journald 2>/dev/null || true
 
 cat > /etc/logrotate.d/familyboard-kiosk <<'EOF'
 /tmp/familyboard-kiosk.log {
@@ -961,6 +965,34 @@ for _pd in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed
   mkdir -p "$_pd" && printf '%s\n' "$_FB_POLICY" > "${_pd}/familyboard.json"
 done
 say "J6b: Chromium-policy satt (tredjeparts-cookies for kalender, ingen oversetting)"
+
+# --- J6c: Nettvakt – koble WiFi til på nytt hvis nettet har vært borte i 3 min ---
+if [[ -f "${LITE_SRC}/recovery/familyboard-net-watchdog.sh" ]]; then
+  install -m 0755 "${LITE_SRC}/recovery/familyboard-net-watchdog.sh" /usr/local/bin/familyboard-net-watchdog.sh
+  cat > /etc/systemd/system/familyboard-net-watchdog.service <<'UNIT'
+[Unit]
+Description=FamilyBoard nettvakt (kobler WiFi til på nytt ved nettfall)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/familyboard-net-watchdog.sh
+UNIT
+  cat > /etc/systemd/system/familyboard-net-watchdog.timer <<'UNIT'
+[Unit]
+Description=Kjør FamilyBoard nettvakt hvert minutt
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now familyboard-net-watchdog.timer 2>/dev/null || true
+  say "J6c: Nettvakt aktivert (WiFi kobles til på nytt etter 3 min uten nett)"
+fi
 
 # --- J7: Recovery-server + HTML ---
 # NB: || warn på hvert steg — under set -e ville én manglende fil ellers

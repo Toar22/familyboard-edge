@@ -48,7 +48,7 @@ for s in chromium-kiosk chromium-kiosk-restart \
          familyboard familyboard-kiosk familyboard-kiosk-restart \
          familyboard-backend \
          familyboard-hotspot familyboard-hotspot-dnsmasq familyboard-hotspot-web \
-         familyboard-recovery wifi-recovery wifi-no-powersave; do
+         familyboard-recovery wifi-recovery wifi-no-powersave familyboard-net-watchdog; do
   systemctl stop "${s}.service" 2>/dev/null || true
   systemctl stop "${s}.timer" 2>/dev/null || true
   systemctl disable "${s}.service" 2>/dev/null || true
@@ -86,6 +86,7 @@ rm -f /etc/systemd/system/familyboard-hotspot-dnsmasq.service
 rm -f /etc/systemd/system/familyboard-hotspot-web.service
 rm -f /etc/systemd/system/familyboard-recovery.service
 rm -f /etc/systemd/system/wifi-recovery.service
+rm -f /etc/systemd/system/familyboard-net-watchdog.service /etc/systemd/system/familyboard-net-watchdog.timer
 rm -f /etc/systemd/system/wifi-no-powersave.service
 rm -f /etc/systemd/system/familyboard*.service
 rm -f /etc/systemd/system/familyboard*.timer
@@ -113,6 +114,7 @@ sudo -u "${PI_USER}" bash -lc "
 say "Fjerner skripter og data..."
 
 rm -f /usr/local/bin/familyboard-wifi-recovery.sh
+rm -f /usr/local/bin/familyboard-net-watchdog.sh
 rm -f /usr/local/bin/familyboard-hotspot-start.sh
 rm -f /usr/local/bin/familyboard-hotspot-config-server.py
 rm -f /usr/local/bin/familyboard-wifi-connect.sh
