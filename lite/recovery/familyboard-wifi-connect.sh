@@ -53,6 +53,8 @@ if command -v nmcli >/dev/null 2>&1 && systemctl is-active NetworkManager >/dev/
     [[ ${attempt} -eq 3 ]] && extra=(hidden yes)   # skjult nettverk?
     if nmcli --wait 30 device wifi connect "${SSID}" password "${PSK}" ifname "${IFACE}" "${extra[@]}" >/dev/null 2>&1; then
       log "nmcli connect OK (forsøk ${attempt})"
+      # Aldri gi opp profilen ved et kortvarig WiFi-fall
+      nmcli connection modify id "${SSID}" connection.autoconnect-retries 0 >/dev/null 2>&1 || true
       ok=1
       break
     fi

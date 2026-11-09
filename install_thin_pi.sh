@@ -809,9 +809,28 @@ if [[ -f "${WAYFIRE_CONF}" ]]; then
   say "Wayfire autostart ryddet"
 fi
 
-# labwc (Bookworm Pi 4/5 nyere default Wayland-compositor)
+# labwc (Raspberry Pi OS Bookworm/Trixie) — NAKEN KIOSK-ØKT, som gamle Edge
+# hadde med openbox. Systemets /etc/xdg/labwc/autostart starter panel
+# (wf-panel-pi, som også er nm-applet → «Authentication required by Wi-Fi
+# network»-vinduer over dashbordet), skrivebord (pcmanfm-pi) og xdg-autostart
+# (polkit/keyring m.m.). En egen ~/.config/labwc/autostart erstatter systemets.
+# Vi beholder bare kanshi (skjermoppsett). Kiosken startes av systemd.
+# Fullt skrivebord igjen: rm ~/.config/labwc/autostart && sudo reboot
 LABWC_AUTOSTART="${PI_HOME}/.config/labwc/autostart"
-if [[ -f "${LABWC_AUTOSTART}" ]]; then
+if [[ -f /etc/xdg/labwc/autostart ]]; then
+  mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+  if [[ -f "${LABWC_AUTOSTART}" ]] && ! grep -q "FamilyBoard Edge Lite" "${LABWC_AUTOSTART}"; then
+    cp "${LABWC_AUTOSTART}" "${LABWC_AUTOSTART}.bak-$(date +%Y%m%d%H%M%S)"
+  fi
+  {
+    echo "# FamilyBoard Edge Lite — naken kiosk-økt (ingen panel/skrivebord/popups)."
+    echo "# Kiosken startes av systemd (chromium-kiosk.service), ikke herfra."
+    echo "# Fullt skrivebord igjen: rm ~/.config/labwc/autostart && sudo reboot"
+    grep -E '^[^#]*kanshi' /etc/xdg/labwc/autostart || true
+  } > "${LABWC_AUTOSTART}"
+  chown -R "${PI_USER}:${PI_USER}" "$(dirname "${LABWC_AUTOSTART}")"
+  say "labwc: naken kiosk-økt (uten panel, skrivebord og WiFi-passordvinduer)"
+elif [[ -f "${LABWC_AUTOSTART}" ]]; then
   cp "${LABWC_AUTOSTART}" "${LABWC_AUTOSTART}.bak-$(date +%Y%m%d%H%M%S)"
   sed -i '/chromium/d; /familyboard/d' "${LABWC_AUTOSTART}" || true
   say "labwc autostart ryddet"
@@ -944,6 +963,18 @@ WantedBy=multi-user.target
 EOF
 systemctl enable wifi-no-powersave.service 2>/dev/null || true
 say "J5: WiFi power-save deaktivert"
+
+# --- J5c: WiFi skal aldri gi opp ---
+# Faller WiFi ut, ber NetworkManager om passordet på nytt. Uten svar («no
+# secrets») gir den opp profilen etter noen forsøk – da ble skjermen stående
+# uten nett i timevis. Uendelige forsøk for alle WiFi-profiler.
+if command -v nmcli >/dev/null 2>&1; then
+  while IFS=: read -r _name _type; do
+    [[ "$_type" == "802-11-wireless" ]] || continue
+    nmcli connection modify "$_name" connection.autoconnect yes connection.autoconnect-retries 0 2>/dev/null || true
+  done < <(nmcli -t -f NAME,TYPE connection show 2>/dev/null)
+  say "J5c: WiFi prøver å koble til igjen i det uendelige"
+fi
 
 # --- J5b: Skjermblanking av på Raspberry Pi OS (gjelder også Wayland/labwc) ---
 if command -v raspi-config >/dev/null 2>&1; then

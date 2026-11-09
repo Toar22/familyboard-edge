@@ -68,7 +68,7 @@ Alternativt, fra et terminalvindu på Pi-en:
 ```bash
 systemctl --user stop chromium-kiosk.service
 DISPLAY=:0 chromium-browser --user-data-dir=$HOME/snap/chromium/common/familyboard-kiosk-profile \
-  --profile-directory=FamilyBoardKiosk https://accounts.google.com &
+  --profile-directory=FamilyBoardKiosk --password-store=basic https://accounts.google.com &
 # logg inn, lukk vinduet, og så:
 systemctl --user start chromium-kiosk.service
 ```
@@ -79,7 +79,7 @@ På **Raspberry Pi OS** (Bookworm/Trixie, Wayland) bruker du i stedet:
 systemctl --user stop chromium-kiosk.service
 XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0 chromium --ozone-platform=wayland \
   --user-data-dir=$HOME/.config/familyboard-kiosk-profile \
-  --profile-directory=FamilyBoardKiosk https://accounts.google.com &
+  --profile-directory=FamilyBoardKiosk --password-store=basic https://accounts.google.com &
 # logg inn, lukk vinduet, og så:
 systemctl --user start chromium-kiosk.service
 ```
@@ -110,6 +110,18 @@ Tilbake til eldre Edge:
 
 ```bash
 sudo bash ~/familyboard-edge/migrering/rollback_gammel_edge.sh && sudo reboot
+```
+
+## Fullt skrivebord (vedlikehold)
+
+På Raspberry Pi OS kjører skjermen en naken kiosk-økt uten panel og skrivebord, så
+ingen vinduer (f.eks. «Authentication required by Wi-Fi network») kan legge seg over
+dashboardet. Trenger du skrivebordet en stund:
+
+```bash
+mv ~/.config/labwc/autostart ~/.config/labwc/autostart.kiosk && sudo reboot
+# tilbake til kiosk:
+mv ~/.config/labwc/autostart.kiosk ~/.config/labwc/autostart && sudo reboot
 ```
 
 ## Avinstallere
