@@ -295,6 +295,7 @@ fi
 apt-get install -y -q \
   curl ca-certificates jq unclutter xdotool wmctrl \
   x11-xserver-utils xauth \
+  fonts-noto-color-emoji \
   iw wireless-tools wpasupplicant \
   hostapd dnsmasq \
   python3-flask python3-requests \
