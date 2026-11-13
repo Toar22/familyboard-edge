@@ -119,9 +119,9 @@ ingen vinduer (f.eks. «Authentication required by Wi-Fi network») kan legge se
 dashboardet. Trenger du skrivebordet en stund:
 
 ```bash
-mv ~/.config/labwc/autostart ~/.config/labwc/autostart.kiosk && sudo reboot
+sudo cp /etc/xdg/labwc/autostart.familyboard-orig /etc/xdg/labwc/autostart && sudo reboot
 # tilbake til kiosk:
-mv ~/.config/labwc/autostart.kiosk ~/.config/labwc/autostart && sudo reboot
+sudo bash ~/familyboard-edge/install_thin_pi.sh
 ```
 
 ## Avinstallere

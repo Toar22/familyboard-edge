@@ -853,11 +853,19 @@ if [[ -f /etc/xdg/labwc/autostart ]]; then
   if [[ -f "${LABWC_AUTOSTART}" ]] && ! grep -q "FamilyBoard Edge Lite" "${LABWC_AUTOSTART}"; then
     cp "${LABWC_AUTOSTART}" "${LABWC_AUTOSTART}.bak-$(date +%Y%m%d%H%M%S)"
   fi
+  # Raspberry Pi OS starter «labwc -m» (merge): da kjøres BÅDE systemets og
+  # brukerens autostart, så brukerfila alene stopper ikke panelet. Kommenter
+  # derfor ut panel/skrivebord/xdg-autostart i systemfila (sikkerhetskopi først;
+  # /etc-filer beholder lokale endringer ved pakkeoppdatering).
+  SYS_AS=/etc/xdg/labwc/autostart
+  [[ -f "${SYS_AS}.familyboard-orig" ]] || cp -p "${SYS_AS}" "${SYS_AS}.familyboard-orig"
+  sed -i -E 's@^([^#]*(wf-panel-pi|pcmanfm-pi|lxsession-xdg-autostart).*)$@# [FamilyBoard kiosk] \1@' "${SYS_AS}"
   {
     echo "# FamilyBoard Edge Lite — naken kiosk-økt (ingen panel/skrivebord/popups)."
     echo "# Kiosken startes av systemd (chromium-kiosk.service), ikke herfra."
-    echo "# Fullt skrivebord igjen: rm ~/.config/labwc/autostart && sudo reboot"
-    grep -E '^[^#]*kanshi' /etc/xdg/labwc/autostart || true
+    echo "# Panel/skrivebord er slått av i /etc/xdg/labwc/autostart (kanshi startes der)."
+    echo "# Fullt skrivebord igjen:"
+    echo "#   sudo cp /etc/xdg/labwc/autostart.familyboard-orig /etc/xdg/labwc/autostart && sudo reboot"
   } > "${LABWC_AUTOSTART}"
   chown -R "${PI_USER}:${PI_USER}" "$(dirname "${LABWC_AUTOSTART}")"
   say "labwc: naken kiosk-økt (uten panel, skrivebord og WiFi-passordvinduer)"

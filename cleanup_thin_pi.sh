@@ -115,6 +115,10 @@ say "Fjerner skripter og data..."
 
 rm -f /usr/local/bin/familyboard-wifi-recovery.sh
 rm -f /usr/local/bin/familyboard-net-watchdog.sh
+# Skrivebordet tilbake på Raspberry Pi OS (installeren kommenterte ut panel m.m.)
+if [[ -f /etc/xdg/labwc/autostart.familyboard-orig ]]; then
+  mv -f /etc/xdg/labwc/autostart.familyboard-orig /etc/xdg/labwc/autostart
+fi
 rm -f /usr/local/bin/familyboard-hotspot-start.sh
 rm -f /usr/local/bin/familyboard-hotspot-config-server.py
 rm -f /usr/local/bin/familyboard-wifi-connect.sh
