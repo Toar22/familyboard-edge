@@ -1165,8 +1165,8 @@ echo "🩺 Diagnose:"
 echo "   systemctl --user status chromium-kiosk.service"
 echo "   tail -f /tmp/familyboard-kiosk.log"
 echo
-warn "IKKE kjør 'sudo apt autoremove' på denne Pi-en — popup-purgen fjernet"
-warn "ubuntu-desktop-metapakken, og autoremove ville da fjerne skrivebordet."
+warn "IKKE kjør 'sudo apt autoremove' på denne Pi-en — det kan fjerne deler av"
+warn "skrivebordet som kiosken trenger."
 
 REPLY="n"
 [[ -z "${FB_NO_REBOOT_PROMPT:-}" ]] && ask "Start på nytt nå så skjermen tar i bruk FamilyBoard? [J/n] "
