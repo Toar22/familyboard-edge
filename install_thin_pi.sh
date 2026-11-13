@@ -496,6 +496,26 @@ RELAUNCH_DELAY="${RELAUNCH_DELAY:-10}"
 #   CHROMIUM_EXTRA_FLAGS="--remote-debugging-port=9222 --disable-gpu"
 read -r -a EXTRA_ARGS <<<"${CHROMIUM_EXTRA_FLAGS:-}"
 
+# --- Bare én kiosk om gangen ---
+# Hindrer at to launchere (f.eks. en rest fra en eldre installasjon eller en
+# dobbel start) kjemper om skjermen.
+exec 9>"/tmp/familyboard-kiosk-${UID:-$(id -u)}.lock"
+if ! flock -n 9; then
+  log "En annen kiosk-launcher kjører allerede – avslutter denne"
+  exit 0
+fi
+
+# --- Vent på skrivebordsøkta ved oppstart ---
+# systemd --user kan starte oss FØR labwc/openbox er oppe. Da valgte vi feil
+# skjerm (X11 i stedet for Wayland), Chromium feilet og ble startet på nytt –
+# synlig som at kiosken «startet to ganger».
+for _i in $(seq 1 45); do
+  pgrep -u "$(id -u)" -x 'labwc|wayfire|sway|cage|weston|openbox|lxsession|xfce4-session|gnome-shell' >/dev/null 2>&1 && break
+  [[ $_i -eq 1 ]] && log "Venter på skrivebordsøkta…"
+  sleep 2
+done
+sleep 2   # la compositoren få laget socketen
+
 # --- Wayland-økt? (Raspberry Pi OS Bookworm/Trixie kjører labwc/wayfire) ---
 # Da er :0 ofte innloggingsskjermens Xwayland (eid av lightdm) – Chromium blir
 # avvist der («Invalid MIT-MAGIC-COOKIE-1 key»). Bruk Wayland-socketen i stedet.
@@ -607,13 +627,22 @@ setup_display_x11() {
 
   # Skjermsparer/DPMS av + skjul musepeker (X11)
   xset -dpms s off s noblank 2>/dev/null || true
-  command -v unclutter >/dev/null 2>&1 && (unclutter -idle 1 -root >/dev/null 2>&1 &) || true
+  command -v unclutter >/dev/null 2>&1 && (unclutter -idle 1 -root >/dev/null 2>&1 9>&- &) || true
 }
 
 # --- Velg mål-URL: Cloud hvis nåbar, ellers lokal recovery-side ---
+FIRST_START=1
+cloud_ok() {
+  curl -fsS --max-time 5 -o /dev/null "${KIOSK_URL}/healthz" 2>/dev/null \
+    || curl -fsS --max-time 5 -o /dev/null "${KIOSK_URL}" 2>/dev/null
+}
 pick_target() {
-  if curl -fsS --max-time 5 -o /dev/null "${KIOSK_URL}/healthz" 2>/dev/null \
-     || curl -fsS --max-time 5 -o /dev/null "${KIOSK_URL}" 2>/dev/null; then
+  # Ved oppstart er WiFi ofte ikke klart ennå: vent opptil 60 s på nett før vi
+  # viser recovery-siden (ellers kom først recovery og så dashbordet – to «starter»).
+  if [[ ${FIRST_START} -eq 1 ]]; then
+    for _n in $(seq 1 12); do cloud_ok && break; sleep 5; done
+  fi
+  if cloud_ok; then
     echo "${KIOSK_URL}"
   else
     log "Cloud ikke nåbar — fallback til recovery (${RECOVERY_URL})" >&2
@@ -638,6 +667,7 @@ while true; do
   sleep 1
 
   TARGET_URL="$(pick_target)"
+  FIRST_START=0   # (pick_target kjører i subshell – nullstill her)
   log "Starter Chromium mot: ${TARGET_URL} (${SCREEN_W}x${SCREEN_H})"
 
   # Fallback: hvis window-manageren dekorerer/halv-størrelser --kiosk-vinduet
@@ -655,7 +685,7 @@ while true; do
         fi
         sleep 1
       done
-    ) &
+    ) 9>&- &
   fi
 
   # -------------------------------------------------------------------------
@@ -695,7 +725,7 @@ while true; do
     --noerrdialogs \
     --disable-session-crashed-bubble \
     --disable-translate \
-    "${TARGET_URL}"
+    "${TARGET_URL}" 9>&-   # Chromium skal ikke arve låsen (ellers blokkerte den neste start)
 
   EC=$?
   log "Chromium avsluttet (exit ${EC}) — starter på nytt om ${RELAUNCH_DELAY}s"
