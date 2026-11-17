@@ -15,6 +15,8 @@ rm -f /etc/lightdm/lightdm.conf.d/60-familyboard-autologin.conf /etc/lightdm/lig
 rm -rf "$H/.config/systemd/user"
 echo "3/4 Gjenoppretter eldre Edge"
 tar -xzpf "$B/files.tgz" -P
+# Skrivebordet tilbake (Edge Lite kommenterte ut panel/skrivebord i labwc på Raspberry Pi OS)
+[ -f /etc/xdg/labwc/autostart.familyboard-orig ] && mv -f /etc/xdg/labwc/autostart.familyboard-orig /etc/xdg/labwc/autostart
 systemctl unmask apt-daily.timer apt-daily-upgrade.timer packagekit.service motd-news.timer \
   update-notifier-download.timer update-notifier-motd.timer 2>/dev/null
 [ -s "$B/root-crontab.txt" ] && crontab "$B/root-crontab.txt"

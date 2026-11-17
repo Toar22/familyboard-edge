@@ -12,7 +12,7 @@ sudo -u "$U" XDG_RUNTIME_DIR=/run/user/$UIDN DBUS_SESSION_BUS_ADDRESS=unix:path=
 crontab -l > "$B/root-crontab.txt" 2>/dev/null || true
 sudo -u "$U" crontab -l > "$B/user-crontab.txt" 2>/dev/null || true
 tar -czpf "$B/files.tgz" --ignore-failed-read -P \
-  /etc/systemd/system /etc/lightdm /etc/gdm3 /var/lib/AccountsService/users /etc/xdg/autostart \
+  /etc/systemd/system /etc/lightdm /etc/gdm3 /var/lib/AccountsService/users /etc/xdg/autostart /etc/xdg/labwc \
   "$H/.config/systemd" "$H/.config/autostart" "$H/.config/openbox" "$H/.config/lxsession" \
   "$H/.config/labwc" "$H/.config/wayfire.ini" 2>/dev/null
 echo "$B" > /root/fb-edge-backup-latest
